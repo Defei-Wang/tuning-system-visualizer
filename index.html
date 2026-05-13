@@ -1,374 +1,511 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acoustic Tuning Algebra Visualizer: Pythagorean vs 12-TET</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>音律代数逻辑可视化 | Tuning System Engine</title>
     <style>
         :root {
-            --bg-color: #1e1e24;
-            --text-color: #f0f0f0;
-            --axis-color: #555;
-            --pyth-color: #ff6b6b;
-            --et-color: #4ecdc4;
-            --highlight: #ffe66d;
-            --panel-bg: #2b2b36;
+            /* 专属定制高级学术灰配色 */
+            --bg-base: #08090a;         /* 纯净暗黑背景 */
+            --bg-panel: #101218;        /* 极暗的面板底色 */
+            --border-dark: #2E365A;     /* 藏青色边框 */
+            --border-light: #3F5B8D;    /* 灰蓝色边框/线条 */
+            --text-main: #e2e4e9;
+            --text-dim: #92A1C2;        /* 浅灰蓝次要文字 */
+            --accent-pyth: #BD6C73;     /* 豆沙红（五度相生律） */
+            --accent-et: #92A1C2;       /* 灰蓝（十二平均律） */
+            --accent-high: #A2869C;     /* 藕紫（高亮/C'点） */
+            --accent-btn: #6B597F;      /* 灰紫（激活状态按钮） */
         }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, sans-serif;
+            background-color: var(--bg-base);
+            color: var(--text-main);
             margin: 0;
-            padding: 2rem 2rem 4rem 2rem;
+            padding: 1.5rem 2rem;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
-            min-height: 100vh;
-            box-sizing: border-box;
-            overflow-y: auto;
-        }
-        .header { margin-bottom: 1rem; }
-        h1 { font-size: 1.5rem; margin: 0 0 0.5rem 0; font-weight: 500; }
-        .subtitle { color: #888; font-size: 0.95rem; }
-        
-        .math-box {
-            background: rgba(255, 255, 255, 0.05);
-            border-left: 4px solid var(--highlight);
-            padding: 1rem 1.5rem;
-            border-radius: 0 8px 8px 0;
-            margin-bottom: 1.5rem;
-            font-family: monospace;
-            font-size: 1rem;
+            overflow-x: hidden;
             line-height: 1.6;
-            color: #ddd;
-        }
-        .math-box code {
-            background: rgba(0,0,0,0.3);
-            padding: 2px 6px;
-            border-radius: 4px;
-            color: var(--highlight);
-            font-weight: bold;
         }
 
-        .controls {
+        /* 顶部导航 */
+        .top-nav {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 1.5rem;
-            background: var(--panel-bg);
-            padding: 1.5rem;
-            border-radius: 8px;
             margin-bottom: 2rem;
+            flex-wrap: wrap;
+            gap: 1rem;
         }
-        
-        .slider-container { flex-grow: 1; display: flex; flex-direction: column; }
-        input[type=range] { width: 100%; cursor: pointer; margin-bottom: 5px; }
-        .datalist-ticks { display: flex; justify-content: space-between; padding: 0 5px; color: #888; font-size: 0.8rem; user-select: none; }
-        .step-display { font-size: 1.2rem; font-weight: bold; min-width: 120px; text-align: right; font-family: monospace; }
-        
-        .canvas-container { position: relative; height: 350px; display: flex; flex-direction: column; justify-content: space-around; padding-right: 5%; margin-bottom: 1rem; }
-        .axis-wrapper { position: relative; height: 120px; width: 100%; }
-        .axis-title { position: absolute; top: -10px; left: 0; font-size: 1.1rem; color: #888; }
-        .axis-line { position: absolute; bottom: 30px; left: 0; width: 100%; height: 2px; background-color: var(--axis-color); }
-        .marker { position: absolute; bottom: 30px; width: 2px; height: 30px; transform: translateX(-50%); transition: left 0.3s ease-out; z-index: 5; }
-        .marker.pyth { background-color: var(--pyth-color); }
-        .marker.et { background-color: var(--et-color); }
-        .marker-label { position: absolute; top: -25px; left: 50%; transform: translateX(-50%); font-size: 0.85rem; white-space: nowrap; background: var(--bg-color); padding: 0 4px; }
-        .marker-cents { position: absolute; bottom: -25px; left: 50%; transform: translateX(-50%); font-size: 0.75rem; color: #888; white-space: nowrap; }
-        .marker.new { z-index: 15; }
-        .marker.new .marker-label { color: var(--highlight); font-weight: bold; font-size: 1rem; z-index: 15; }
-        
-        .info-panel { background: var(--panel-bg); padding: 1.5rem; border-radius: 8px; min-height: 140px; font-family: monospace; font-size: 1.1rem; line-height: 1.8; margin-bottom: 2rem; }
-        
-        .play-inline-btn { background-color: #333; color: #fff; border: 1px solid #666; padding: 0.2rem 0.6rem; font-size: 0.9rem; border-radius: 4px; margin-left: 10px; cursor: pointer; vertical-align: middle; font-family: -apple-system, BlinkMacSystemFont, sans-serif; transition: all 0.2s; }
-        .play-inline-btn:active { transform: scale(0.95); }
-        .play-inline-btn.pyth-btn:hover { background-color: var(--pyth-color); color: #000; border-color: var(--pyth-color); }
-        .play-inline-btn.et-btn:hover { background-color: var(--et-color); color: #000; border-color: var(--et-color); }
-        .play-inline-btn.mix-btn { background-color: #444; }
-        .play-inline-btn.mix-btn:hover { background-color: var(--highlight); color: #000; border-color: var(--highlight); font-weight: bold; }
-
-        .octave-line { position: absolute; top: 0; bottom: 0; width: 1px; border-left: 1px dashed rgba(255,255,255,0.3); z-index: 0; }
-        .octave-label { position: absolute; bottom: -20px; transform: translateX(-50%); color: rgba(255,255,255,0.5); font-size: 0.85rem; white-space: nowrap; }
-        .error-bracket { position: absolute; bottom: 70px; height: 15px; border-left: 1px solid var(--highlight); border-right: 1px solid var(--highlight); border-top: 1px solid var(--highlight); display: none; z-index: 20; }
-        .error-text { position: absolute; top: -40px; width: auto; white-space: nowrap; text-align: center; left: 50%; transform: translateX(-50%); color: var(--bg-color); background-color: var(--highlight); padding: 2px 8px; border-radius: 4px; font-size: 0.9rem; font-weight: bold; }
-        /* 多语言切换按钮样式 */
-        .lang-switch {
-            position: absolute;
-            top: 2rem;
-            right: 2rem;
+        .unit-toggle {
+            display: flex;
+            background: var(--bg-panel);
+            border-radius: 8px;
+            padding: 4px;
+            border: 1px solid var(--border-dark);
+        }
+        .unit-btn {
+            background: transparent;
+            color: var(--text-dim);
+            border: none;
+            padding: 0.5rem 1.2rem;
+            font-size: 0.85rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .unit-btn.active {
+            background: var(--accent-btn);
+            color: #fff;
+            font-weight: 600;
+        }
+        .lang-toggle {
             display: flex;
             gap: 0.5rem;
-            background: var(--panel-bg);
-            padding: 0.4rem;
-            border-radius: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            border: 1px solid var(--axis-color);
-            z-index: 100;
         }
         .lang-btn {
+            color: var(--text-dim);
             text-decoration: none;
-            color: var(--text-color);
-            font-size: 0.85rem;
-            font-weight: bold;
+            font-size: 0.8rem;
+            font-weight: 600;
             padding: 0.4rem 0.8rem;
-            border-radius: 15px;
-            transition: all 0.2s ease;
-            opacity: 0.6;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 1px solid transparent;
         }
-        .lang-btn.active {
-            background: var(--highlight);
-            color: #000;
-            opacity: 1;
+        .lang-btn.active { color: var(--accent-high); border-color: var(--accent-high); }
+
+        /* 学术规则区 */
+        h1 { font-size: 1.5rem; margin: 0 0 1rem 0; font-weight: 600; letter-spacing: 0.5px; }
+        .logic-card {
+            background: var(--bg-panel);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-dark);
         }
-        .lang-btn:hover:not(.active) {
-            opacity: 1;
-            background: rgba(255, 255, 255, 0.1);
+        .logic-card code { 
+            color: var(--accent-high); 
+            background: rgba(162, 134, 156, 0.15); 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-family: monospace; 
+            font-weight: bold;
+        }
+
+        /* 控制滑块区 */
+        .controls-card {
+            background: var(--bg-panel);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border-dark);
+        }
+        .slider-row { margin-bottom: 1.5rem; }
+        .slider-row:last-child { margin-bottom: 0; }
+        .slider-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 0.5rem; }
+        .slider-title { font-size: 0.9rem; font-weight: 600; color: var(--text-dim); }
+        .step-value { font-family: monospace; font-size: 1.2rem; color: var(--accent-high); font-weight: bold;}
+        
+        .slider-wrapper { position: relative; padding: 0 12px; }
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 6px;
+            background: var(--border-light);
+            border-radius: 3px;
+            outline: none;
+            position: relative;
+            z-index: 2;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--bg-base);
+            border-radius: 50%;
+            cursor: pointer;
+            border: 4px solid var(--accent-high);
+            box-shadow: 0 0 10px rgba(162, 134, 156, 0.4);
+        }
+        
+        /* 对齐的物理刻度 */
+        .slider-ticks {
+            display: flex;
+            justify-content: space-between;
+            padding: 0;
+            margin-top: 6px;
+            color: #666;
+            font-size: 0.75rem;
+            font-family: monospace;
+        }
+        .slider-ticks span {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 20px;
+        }
+        .slider-ticks span::before {
+            content: '';
+            display: block;
+            width: 2px;
+            height: 6px;
+            background-color: var(--border-dark);
+            margin-bottom: 4px;
+        }
+
+        /* 渲染画布 (防溢出设计) */
+        .viewport { width: 100%; overflow-x: auto; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+        .canvas { min-width: 650px; height: 350px; position: relative; padding-top: 2rem; }
+        
+        .coordinate-label {
+            position: absolute;
+            top: 0; left: 0;
+            font-size: 0.8rem;
+            color: var(--accent-high);
+            background: rgba(162, 134, 156, 0.1);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            border: 1px solid rgba(162, 134, 156, 0.3);
+        }
+
+        .axis { height: 130px; position: relative; width: 100%; }
+        /* 轴线左右缩进，匹配映射范围 */
+        .axis-baseline { position: absolute; bottom: 45px; left: 5%; width: 75%; height: 1px; background: var(--border-light); }
+        .axis-name { position: absolute; top: 15px; left: 5%; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.5px; }
+        
+        .node { position: absolute; bottom: 45px; width: 2px; height: 30px; transform: translateX(-50%); transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); z-index: 5; }
+        .node.pyth { background: var(--accent-pyth); }
+        .node.et { background: var(--accent-et); }
+        .node-tag { position: absolute; top: -26px; left: 50%; transform: translateX(-50%); font-size: 0.75rem; white-space: nowrap; color: var(--text-dim); background: var(--bg-base); padding: 0 4px; }
+        .node.active .node-tag { color: var(--bg-base); background: var(--accent-high); font-weight: bold; border-radius: 3px; padding: 2px 6px; top: -28px; z-index: 10;}
+        .node-val { position: absolute; bottom: -24px; left: 50%; transform: translateX(-50%); font-family: monospace; font-size: 0.75rem; color: #777; }
+
+        .boundary { position: absolute; top: 20px; bottom: 0; width: 1px; border-left: 1px dashed var(--border-light); z-index: 1; }
+        .boundary-tag { position: absolute; bottom: -20px; transform: translateX(-50%); font-size: 0.75rem; color: var(--border-light); font-family: monospace; white-space: nowrap; font-weight: bold;}
+
+        /* 误差区间：绝对不会再溢出屏幕 */
+        .gap-bracket { position: absolute; bottom: 85px; height: 10px; border: 1px solid var(--accent-high); border-bottom: none; display: none; z-index: 10; }
+        .gap-val { position: absolute; top: -28px; left: 50%; transform: translateX(-50%); color: var(--accent-high); font-size: 0.8rem; font-family: monospace; white-space: nowrap; font-weight: bold; background: var(--bg-base); padding: 0 4px;}
+
+        /* 数据面板 */
+        .data-card { background: var(--bg-panel); border-radius: 12px; padding: 1.5rem; border: 1px solid var(--border-dark); font-family: monospace; line-height: 2; font-size: 0.95rem; }
+        .action-btn { background: var(--bg-base); color: var(--text-primary); border: 1px solid var(--border-dark); padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 0.85rem; margin-right: 0.5rem; margin-bottom: 0.5rem; display: inline-block;}
+        .action-btn:hover { border-color: var(--accent-high); color: var(--accent-high); }
+        .action-btn.mix { border-color: var(--border-light); }
+        .action-btn.mix:hover { background: var(--border-light); color: #fff;}
+
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            .top-nav { flex-direction: column; align-items: flex-start; }
+            .unit-toggle { width: 100%; flex-direction: column; }
+            .unit-btn { text-align: center; border-bottom: 1px solid var(--border-dark); border-radius: 0; }
+            .unit-btn:last-child { border-bottom: none; }
+            .action-btn { display: block; width: fit-content; }
         }
     </style>
 </head>
 <body>
-    <!-- 语言切换器 (指向 zh.html) -->
-    <div class="lang-switch">
-        <span class="lang-btn active">EN</span>
-        <a href="./zh.html" class="lang-btn">中文</a>
-    </div>
-    <div class="header">
-        <h1>Acoustic Tuning Algebra Visualizer: Pythagorean vs 12-TET</h1>
-        <div class="subtitle">Observing the algebraic inconsistency of Pythagorean tuning and the systematic loop reconstruction in 12-Tone Equal Temperament.</div>
+
+    <div class="top-nav">
+        <div class="unit-toggle">
+            <button id="btnRatio" class="unit-btn active" onclick="setState('unit', 'ratio')"></button>
+            <button id="btnCents" class="unit-btn" onclick="setState('unit', 'cents')"></button>
+        </div>
+        <div class="lang-toggle">
+            <span id="btnEn" class="lang-btn" onclick="setState('lang', 'en')">EN</span>
+            <span id="btnZh" class="lang-btn active" onclick="setState('lang', 'zh')">中文</span>
+        </div>
     </div>
 
-    <div class="math-box">
-        <strong>Physical Meaning of Cents:</strong><br>
-        Human perception of frequency is logarithmic. To convert frequency ratios into linear algebra, the absolute octave (2:1) is defined as 1200 Cents.<br>
-        <strong>Algebraic Equation:</strong> <code>n = 1200 × log₂(f₂ / f₁)</code><br>
-        ▸ Pure Fifth (Ratio 3:2) = <code>1200 × log₂(1.5) ≈ 701.955 Cents</code><br>
-        ▸ 12-TET Fifth (Ratio 2^(7/12)) = <code>1200 × (7/12) = 700.000 Cents</code><br>
-        <em>The initial deviation is less than 2 cents. The exponential accumulation of this microscopic error leads to the final physical conflict of the acoustic system.</em>
-    </div>
+    <h1 id="pageTitle"></h1>
 
-    <div class="controls">
-        <div class="slider-container">
-            <input type="range" id="stepSlider" min="0" max="12" step="1" value="0" list="tickmarks" oninput="handleSliderChange()">
-            <datalist id="tickmarks">
-                <option value="0"></option><option value="1"></option><option value="2"></option>
-                <option value="3"></option><option value="4"></option><option value="5"></option>
-                <option value="6"></option><option value="7"></option><option value="8"></option>
-                <option value="9"></option><option value="10"></option><option value="11"></option>
-                <option value="12"></option>
-            </datalist>
-            <div class="datalist-ticks">
-                <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
-                <span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span>
+    <div id="logicBox" class="logic-card"></div>
+
+    <div class="controls-card">
+        <div class="slider-row">
+            <div class="slider-header">
+                <span id="lblFifths" class="slider-title"></span>
+                <span id="valFifths" class="step-value">0</span>
+            </div>
+            <div class="slider-wrapper">
+                <input type="range" id="sliderFifths" min="0" max="12" value="0" oninput="dispatchUpdate('fifths')">
+                <div class="slider-ticks">
+                    <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span>
+                </div>
             </div>
         </div>
-        <div class="step-display" id="stepDisplay">Iteration: 0 / 12</div>
-    </div>
-
-    <div class="canvas-container" id="canvas">
-        <div class="octave-line" id="octaveLine"><div class="octave-label">1200 Cents (Absolute Octave Boundary)</div></div>
-        
-        <div class="axis-wrapper" id="axisPyth">
-            <div class="axis-title" style="color: var(--pyth-color);">Pythagorean Tuning (Strictly adds log₂(1.5) ≈ 701.955 Cents)</div>
-            <div class="axis-line"></div>
-            <div class="error-bracket" id="errorBracket"><div class="error-text">Pythagorean Comma: ~23.46 Cents</div></div>
-        </div>
-        
-        <div class="axis-wrapper" id="axisEt">
-            <div class="axis-title" style="color: var(--et-color);">12-TET (Strictly adds 700.000 Cents)</div>
-            <div class="axis-line"></div>
+        <div class="slider-row">
+            <div class="slider-header">
+                <span id="lblLinear" class="slider-title"></span>
+                <span id="valLinear" class="step-value">0</span>
+            </div>
+            <div class="slider-wrapper">
+                <input type="range" id="sliderLinear" min="0" max="12" value="0" oninput="dispatchUpdate('linear')">
+                <div class="slider-ticks">
+                    <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="info-panel" id="infoPanel">
-        Drag the slider to begin iteration.
+    <div class="viewport">
+        <div class="canvas">
+            <div id="coordLabel" class="coordinate-label"></div>
+            <div class="boundary" id="boundLine"><div id="boundLabel" class="boundary-tag"></div></div>
+            
+            <div class="axis" id="axisPyth">
+                <div id="titlePyth" class="axis-name" style="color: var(--accent-pyth);"></div>
+                <div class="axis-baseline"></div>
+                <div class="gap-bracket" id="gapBkt"><div id="gapVal" class="gap-val"></div></div>
+            </div>
+
+            <div class="axis" id="axisEt">
+                <div id="titleEt" class="axis-name" style="color: var(--accent-et);"></div>
+                <div class="axis-baseline"></div>
+            </div>
+        </div>
     </div>
+
+    <div id="dataPanel" class="data-card"></div>
 
     <script>
-        const MAX_CENTS_DISPLAY = 1280; 
-        const PURE_FIFTH = 1200 * Math.log2(1.5); 
-        const ET_FIFTH = 700.0;
-        const NOTES = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#', 'F', "C' (+1 Octave)"];
+        const I18N = {
+            zh: {
+                title: "乐律代数逻辑可视化",
+                btnRatio: "单位：频率比值 (代数乘方)",
+                btnCents: "单位：音分 Cents (声学对数)",
+                lblFifths: "滑块：按五度相生顺序 (跳跃)",
+                lblLinear: "滑块：按半音音阶顺序 (递增)",
+                boundRatio: "2.0000 (八度基准线)",
+                boundCents: "1200 音分 (八度基准线)",
+                titlePyth: "五度相生律 (有理数乘方)",
+                titleEt: "十二平均律 (无理数均分)",
+                coordRatio: "当前坐标: 频率倍数",
+                coordCents: "当前坐标: 相对音分",
+                boxRatio: `
+                    <strong>代数推演规则：</strong>基准音 C = <code>1.0000</code>。高八度 C' = <code>2.0000</code>。<br>
+                    ▸ <strong>五度相生律：</strong> R<sub>n</sub> = 1.5<sup>n</sup> &divide; 2<sup>m</sup>。每次乘 1.5（纯五度），若结果超过 2（高八度边界）则除以 2 折叠回原八度内。<br>
+                    ▸ <strong>十二平均律：</strong> R<sub>k</sub> = 2<sup>k/12</sup>。代入无理数底数，强行将八度几何等分。
+                `,
+                boxCents: `
+                    <strong>声学推演规则：</strong>人耳听觉呈对数关系。定义高八度为 <code>1200</code> 音分。<br>
+                    对数公式：<code>n = 1200 &times; log<sub>2</sub>(f₂ / f₁)</code><br>
+                    ▸ <strong>五度相生律：</strong> 每次固定累加纯正五度距离（<code>1200 &times; log<sub>2</sub>(1.5) &approx; 701.96</code> 音分）。<br>
+                    ▸ <strong>十二平均律：</strong> 每次固定累加半音距离（<code>100.00</code> 音分整）。
+                `,
+                errRatio: "误差: +0.0273 倍",
+                errCents: "误差: +23.46 音分",
+                init: "系统初始化完毕。请拖动滑块查看对应音符的数据。",
+                playBase: "▶ 试听基准音 Do (C)",
+                target: "当前音符: ",
+                pythDataRatio: "五度相生律数值",
+                etDataRatio: "十二平均律数值",
+                pythDataCents: "五度相生律音分",
+                etDataCents: "十二平均律音分",
+                eq: "计算式",
+                unit: "音分",
+                verify: "▶ 独立试听",
+                mix: "▶ 拍频干涉测试"
+            },
+            en: {
+                title: "Acoustic Tuning Algebra Visualizer",
+                btnRatio: "Unit: Frequency Ratio (Algebra)",
+                btnCents: "Unit: Cents (Logarithmic)",
+                lblFifths: "Slider: Cycle of Fifths",
+                lblLinear: "Slider: Chromatic Scale",
+                boundRatio: "2.0000 (Octave Limit)",
+                boundCents: "1200 Cents (Octave Limit)",
+                titlePyth: "Pythagorean Tuning (Rational Base)",
+                titleEt: "12-TET (Irrational Base)",
+                coordRatio: "Axis: Frequency Ratio",
+                coordCents: "Axis: Cents",
+                boxRatio: `
+                    <strong>Algebraic Rule:</strong> Base C = <code>1.0000</code>. Octave C' = <code>2.0000</code>.<br>
+                    ▸ <strong>Pythagorean:</strong> R<sub>n</sub> = 1.5<sup>n</sup> &divide; 2<sup>m</sup>. Multiply by 1.5 (Perfect Fifth). If > 2, divide by 2 to fold back.<br>
+                    ▸ <strong>12-TET:</strong> R<sub>k</sub> = 2<sup>k/12</sup>. Geometric progression utilizing an irrational base.
+                `,
+                boxCents: `
+                    <strong>Acoustic Rule:</strong> Auditory resolution is logarithmic. Octave = <code>1200</code> Cents.<br>
+                    Formula: <code>n = 1200 &times; log<sub>2</sub>(f₂ / f₁)</code><br>
+                    ▸ <strong>Pythagorean:</strong> Constant addition of <code>1200 &times; log<sub>2</sub>(1.5) &approx; 701.96</code> Cents.<br>
+                    ▸ <strong>12-TET:</strong> Constant addition of exactly <code>100.00</code> Cents per semitone.
+                `,
+                errRatio: "Error: +0.0273x",
+                errCents: "Error: +23.46 Cents",
+                init: "Engine ready. Adjust parameters via sliders to begin.",
+                playBase: "▶ Play Root Note Do (C)",
+                target: "Current Note: ",
+                pythDataRatio: "Pythagorean Value",
+                etDataRatio: "12-TET Value",
+                pythDataCents: "Pythagorean Cents",
+                etDataCents: "12-TET Cents",
+                eq: "Formula",
+                unit: "Cents",
+                verify: "▶ Play Tone",
+                mix: "▶ Interference Test"
+            }
+        };
+
+        const NOTES = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#', 'F', "C'"];
+        const CHROMA = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B', "C'"];
         
-        let audioCtx = null;
-        let activeOscillators = [];
+        let actx = null;
+        let oscs = [];
+        let state = { unit: 'ratio', lang: 'zh', mode: 'fifths' };
 
-        function stopAudio() {
-            activeOscillators.forEach(osc => {
-                try { osc.stop(); } catch(e) {}
+        function setState(k, v) {
+            state[k] = v;
+            syncUI();
+            dispatchUpdate(state.mode, false);
+        }
+
+        function syncUI() {
+            const t = I18N[state.lang];
+            ['btnRatio', 'btnCents'].forEach(id => {
+                document.getElementById(id).className = `unit-btn ${state.unit === id.replace('btn', '').toLowerCase() ? 'active' : ''}`;
             });
-            activeOscillators = [];
-        }
-
-        function playTone(cents) {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            stopAudio();
-
-            const baseFreq = 261.626; // C4
-            const freq = baseFreq * Math.pow(2, cents / 1200);
-
-            const osc = audioCtx.createOscillator();
-            const gainNode = audioCtx.createGain();
-            osc.type = 'sine'; 
-            osc.frequency.value = freq;
-
-            const now = audioCtx.currentTime;
-            gainNode.gain.setValueAtTime(0, now);
-            gainNode.gain.linearRampToValueAtTime(0.2, now + 0.05); 
-            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 4.0); 
-
-            osc.connect(gainNode);
-            gainNode.connect(audioCtx.destination);
-            osc.start(now);
-            osc.stop(now + 4.5);
+            ['btnEn', 'btnZh'].forEach(id => {
+                document.getElementById(id).className = `lang-btn ${state.lang === id.replace('btn', '').toLowerCase() ? 'active' : ''}`;
+            });
             
-            activeOscillators.push(osc);
+            document.getElementById('pageTitle').innerText = t.title;
+            document.getElementById('btnRatio').innerText = t.btnRatio;
+            document.getElementById('btnCents').innerText = t.btnCents;
+            document.getElementById('lblFifths').innerText = t.lblFifths;
+            document.getElementById('lblLinear').innerText = t.lblLinear;
+            document.getElementById('titlePyth').innerText = t.titlePyth;
+            document.getElementById('titleEt').innerText = t.titleEt;
+            document.getElementById('coordLabel').innerText = state.unit === 'ratio' ? t.coordRatio : t.coordCents;
+            document.getElementById('boundLabel').innerText = state.unit === 'ratio' ? t.boundRatio : t.boundCents;
+            document.getElementById('logicBox').innerHTML = state.unit === 'ratio' ? t.boxRatio : t.boxCents;
         }
 
-        function playInterference(cents1, cents2) {
-            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            stopAudio();
-
-            const baseFreq = 261.626; 
-            const freq1 = baseFreq * Math.pow(2, cents1 / 1200);
-            const freq2 = baseFreq * Math.pow(2, cents2 / 1200);
-
-            const now = audioCtx.currentTime;
-
-            const osc1 = audioCtx.createOscillator();
-            const gainNode1 = audioCtx.createGain();
-            osc1.type = 'sine';
-            osc1.frequency.value = freq1;
-            gainNode1.gain.setValueAtTime(0, now);
-            gainNode1.gain.linearRampToValueAtTime(0.15, now + 0.05); 
-            gainNode1.gain.exponentialRampToValueAtTime(0.0001, now + 4.0); 
-            osc1.connect(gainNode1);
-            gainNode1.connect(audioCtx.destination);
-            osc1.start(now);
-            osc1.stop(now + 4.5);
-
-            const osc2 = audioCtx.createOscillator();
-            const gainNode2 = audioCtx.createGain();
-            osc2.type = 'sine';
-            osc2.frequency.value = freq2;
-            gainNode2.gain.setValueAtTime(0, now);
-            gainNode2.gain.linearRampToValueAtTime(0.15, now + 0.05); 
-            gainNode2.gain.exponentialRampToValueAtTime(0.0001, now + 4.0); 
-            osc2.connect(gainNode2);
-            gainNode2.connect(audioCtx.destination);
-            osc2.start(now);
-            osc2.stop(now + 4.5);
-
-            activeOscillators.push(osc1, osc2);
-        }
-
-        function handleSliderChange() {
-            const step = parseInt(document.getElementById('stepSlider').value);
-            updateVisuals(step);
+        function emitSound(r1, r2 = null) {
+            if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+            if (actx.state === 'suspended') actx.resume();
+            oscs.forEach(o => { try{ o.stop(); }catch(e){} }); oscs = [];
             
-            if (step > 0) {
-                let rawPyth = step * PURE_FIFTH;
-                let displayPyth = (step === 12) ? (rawPyth - 7 * 1200 + 1200) : (rawPyth % 1200);
-                let rawEt = step * ET_FIFTH;
-                let displayEt = (step === 12) ? 1200 : (rawEt % 1200);
-                playInterference(displayPyth, displayEt);
-            }
+            const ratios = r2 ? [r1, r2] : [r1];
+            ratios.forEach(r => {
+                const osc = actx.createOscillator();
+                const gain = actx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = 261.626 * r; 
+                gain.gain.setValueAtTime(0, actx.currentTime);
+                gain.gain.linearRampToValueAtTime(r2 ? 0.12 : 0.25, actx.currentTime + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 4.5);
+                osc.connect(gain).connect(actx.destination);
+                osc.start(); osc.stop(actx.currentTime + 5);
+                oscs.push(osc);
+            });
         }
 
-        function updateVisuals(step) {
-            document.getElementById('stepDisplay').innerText = `Iteration: ${step} / 12`;
+        function computeState(step, mode) {
+            let n = mode === 'fifths' ? step : (step * 7) % 12;
+            if (mode === 'linear' && step === 12) n = 12;
+
+            let k = mode === 'linear' ? step : (step * 7) % 12;
+            if (mode === 'fifths' && step === 12) k = 12;
+
+            let m = 0, pRatio = Math.pow(1.5, n);
+            if (n === 12) { m = 6; pRatio /= 64; } else { while(pRatio >= 2.0) { pRatio /= 2.0; m++; } }
             
-            const axisPyth = document.getElementById('axisPyth');
-            const axisEt = document.getElementById('axisEt');
-            const infoPanel = document.getElementById('infoPanel');
-            const errorBracket = document.getElementById('errorBracket');
+            const eRatio = k === 12 ? 2.0 : Math.pow(2, k / 12);
 
-            document.querySelectorAll('.data-marker').forEach(e => e.remove());
+            let pCents = n * 1200 * Math.log2(1.5);
+            pCents = n === 12 ? pCents - 7200 : pCents % 1200;
+            const eCents = k * 100;
+            
+            return { pRatio, eRatio, pCents, eCents, m, n, k, note: mode === 'linear' ? CHROMA[step] : NOTES[step] };
+        }
 
-            let currentPythCents = 0;
-            let currentEtCents = 0;
+        function dispatchUpdate(mode, audio = true) {
+            state.mode = mode;
+            const stepId = mode === 'linear' ? 'sliderLinear' : 'sliderFifths';
+            const val = parseInt(document.getElementById(stepId).value);
+            
+            document.getElementById('valFifths').innerText = mode === 'fifths' ? val : '-';
+            document.getElementById('valLinear').innerText = mode === 'linear' ? val : '-';
+            if(mode === 'fifths') document.getElementById('sliderLinear').value = 0;
+            if(mode === 'linear') document.getElementById('sliderFifths').value = 0;
 
-            for (let i = 0; i <= step; i++) {
-                let rawPyth = i * PURE_FIFTH;
-                let displayPyth = (i === 12) ? (rawPyth - 7 * 1200 + 1200) : (rawPyth % 1200);
-
-                let rawEt = i * ET_FIFTH;
-                let displayEt = (i === 12) ? 1200 : (rawEt % 1200);
-
-                const isNew = (i === step);
-
-                createMarker(axisPyth, displayPyth, NOTES[i], 'pyth', isNew);
-                createMarker(axisEt, displayEt, NOTES[i], 'et', isNew);
-
-                if (isNew) {
-                    currentPythCents = displayPyth;
-                    currentEtCents = displayEt;
-                }
+            const D = computeState(val, mode);
+            drawCanvas(val, mode);
+            
+            const T = I18N[state.lang];
+            const panel = document.getElementById('dataPanel');
+            
+            if (val === 0) {
+                if (audio) emitSound(1.0);
+                panel.innerHTML = `${T.init}<br><br><button class="action-btn" onclick="emitSound(1.0)">${T.playBase}</button>`;
+                return;
             }
 
-            const octavePos = (1200 / MAX_CENTS_DISPLAY) * 100;
-            document.getElementById('octaveLine').style.left = `${octavePos}%`;
+            if (audio) emitSound(D.pRatio, D.eRatio);
 
-            if (step === 12) {
-                const pythFinal = (12 * PURE_FIFTH) - 7 * 1200 + 1200;
-                const startPct = (1200 / MAX_CENTS_DISPLAY) * 100;
-                const endPct = (pythFinal / MAX_CENTS_DISPLAY) * 100;
-                
-                errorBracket.style.display = 'block';
-                errorBracket.style.left = `${startPct}%`;
-                errorBracket.style.width = Math.max((endPct - startPct), 1.5) + `%`;
-
-                infoPanel.innerHTML = `
-                    <span style="color:var(--highlight); font-weight:bold;">[System Boundary: Algebraic Inconsistency Exposed]</span><br>
-                    Iterating the pure fifth 12 times produces an algebraic error of <code>23.46 Cents</code> (Pythagorean Comma), conflicting with the physical laws of absolute octaves.<br>
-                    To achieve a closed loop and enable free modulation, 12-TET introduces the irrational number <code>2^(1/12)</code> to linearly distribute this error and force boundary alignment.<br>
-                    <div style="margin-top: 10px;">
-                        <button class="play-inline-btn pyth-btn" onclick="playTone(${currentPythCents})">▶ Verify Unclosed C'</button>
-                        <button class="play-inline-btn et-btn" onclick="playTone(${currentEtCents})">▶ Verify Aligned C'</button>
-                        <button class="play-inline-btn mix-btn" onclick="playInterference(${currentPythCents}, ${currentEtCents})">▶ Interference Test (Beat Frequency)</button>
-                    </div>
-                `;
-            } else if (step > 0) {
-                errorBracket.style.display = 'none';
-                
-                const f1 = 261.626 * Math.pow(2, currentPythCents / 1200);
-                const f2 = 261.626 * Math.pow(2, currentEtCents / 1200);
-                const beatFreq = Math.abs(f1 - f2).toFixed(2);
-
-                infoPanel.innerHTML = `
-                    Current Node: <span style="color:var(--highlight); font-weight:bold;">${NOTES[step]}</span> (Algebraic Deviation: <code>${(currentPythCents - currentEtCents).toFixed(2)}</code> Cents)<br>
-                    Pythagorean Mapping: ${currentPythCents.toFixed(2)} Cents 
-                    <button class="play-inline-btn pyth-btn" onclick="playTone(${currentPythCents})">▶ Verify Frequency</button><br>
-                    12-TET Mapping: ${currentEtCents.toFixed(2)} Cents
-                    <button class="play-inline-btn et-btn" onclick="playTone(${currentEtCents})">▶ Verify Frequency</button><br>
-                    <span style="color:#aaa;">Acoustic Interference Physics: The theoretical beat frequency at this node is <code>${beatFreq} Hz</code>.</span>
-                    <button class="play-inline-btn mix-btn" onclick="playInterference(${currentPythCents}, ${currentEtCents})">▶ Interference Test (Simultaneous Play)</button>
+            if (state.unit === 'ratio') {
+                const eqP = `1.5<sup>${D.n}</sup> &divide; 2<sup>${D.m}</sup>`;
+                const eqE = D.k === 12 ? `2<sup>12/12</sup>` : `2<sup>${D.k}/12</sup>`;
+                panel.innerHTML = `
+                    ${T.target} <strong style="color:var(--accent-high); font-size:1.2rem;">${D.note}</strong><br>
+                    ${T.pythDataRatio}: <code>${D.pRatio.toFixed(4)}</code> (${T.eq}: ${eqP}) <button class="action-btn" onclick="emitSound(${D.pRatio})">${T.verify}</button><br>
+                    ${T.etDataRatio}: <code>${D.eRatio.toFixed(4)}</code> (${T.eq}: ${eqE}) <button class="action-btn" onclick="emitSound(${D.eRatio})">${T.verify}</button><br>
+                    <button class="action-btn mix" onclick="emitSound(${D.pRatio}, ${D.eRatio})">${T.mix}</button>
                 `;
             } else {
-                errorBracket.style.display = 'none';
-                infoPanel.innerHTML = `System initialized at 0 Cents baseline. Drag the slider to begin algebraic iteration.`;
+                panel.innerHTML = `
+                    ${T.target} <strong style="color:var(--accent-high); font-size:1.2rem;">${D.note}</strong><br>
+                    ${T.pythDataCents}: <code>${D.pCents.toFixed(2)}</code> ${T.unit} <button class="action-btn" onclick="emitSound(${D.pRatio})">${T.verify}</button><br>
+                    ${T.etDataCents}: <code>${D.eCents.toFixed(2)}</code> ${T.unit} <button class="action-btn" onclick="emitSound(${D.eRatio})">${T.verify}</button><br>
+                    <button class="action-btn mix" onclick="emitSound(${D.pRatio}, ${D.eRatio})">${T.mix}</button>
+                `;
             }
         }
 
-        function createMarker(parent, cents, label, type, isNew) {
-            const pct = (cents / MAX_CENTS_DISPLAY) * 100;
-            const marker = document.createElement('div');
-            marker.className = `marker data-marker ${type} ${isNew ? 'new' : ''}`;
-            marker.style.left = `${pct}%`;
+        function drawCanvas(step, mode) {
+            document.querySelectorAll('.data-node').forEach(el => el.remove());
+            const limits = state.unit === 'ratio' ? {min:1.0, max:2.05, oct:2.0} : {min:0, max:1280, oct:1200};
+            
+            // 【核心防溢出重构】：保留左侧5%，强制右侧留出 20% 安全余量，文本绝对不会再顶出屏幕。
+            const mapX = v => 5 + ((v - limits.min) / (limits.max - limits.min)) * 75;
+            
+            document.getElementById('boundLine').style.left = mapX(limits.oct) + '%';
+            
+            let termP = 0;
+            for(let i=0; i<=step; i++) {
+                const d = computeState(i, mode);
+                const pV = state.unit === 'ratio' ? d.pRatio : d.pCents;
+                const eV = state.unit === 'ratio' ? d.eRatio : d.eCents;
+                renderNode('axisPyth', pV, d.note, 'pyth', i===step, state.unit==='ratio'?pV.toFixed(3):Math.round(pV), mapX);
+                renderNode('axisEt', eV, d.note, 'et', i===step, state.unit==='ratio'?eV.toFixed(3):Math.round(eV), mapX);
+                if (i===step) termP = pV;
+            }
 
-            const labelEl = document.createElement('div');
-            labelEl.className = 'marker-label';
-            labelEl.innerText = label;
-
-            const centsEl = document.createElement('div');
-            centsEl.className = 'marker-cents';
-            centsEl.innerText = Math.round(cents);
-
-            marker.appendChild(labelEl);
-            marker.appendChild(centsEl);
-            parent.appendChild(marker);
+            const bkt = document.getElementById('gapBkt');
+            if(step === 12) {
+                const final = computeState(12, mode);
+                const pEnd = state.unit === 'ratio' ? final.pRatio : final.pCents + 1200;
+                bkt.style.display = 'block';
+                bkt.style.left = mapX(limits.oct) + '%';
+                bkt.style.width = (mapX(pEnd) - mapX(limits.oct)) + '%';
+                document.getElementById('gapVal').innerText = I18N[state.lang][state.unit === 'ratio' ? 'errRatio' : 'errCents'];
+            } else { bkt.style.display = 'none'; }
         }
-        
-        window.onload = () => updateVisuals(0);
+
+        function renderNode(pid, v, label, type, active, numTxt, mapX) {
+            const n = document.createElement('div');
+            n.className = `node data-node ${type} ${active ? 'active' : ''}`;
+            n.style.left = mapX(v) + '%';
+            n.innerHTML = `<div class="node-tag">${label}</div><div class="node-val">${numTxt}</div>`;
+            document.getElementById(pid).appendChild(n);
+        }
+
+        window.onload = () => { syncUI(); dispatchUpdate('fifths', false); };
     </script>
 </body>
 </html>
