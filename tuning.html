@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>音律生成代数逻辑可视化：五度相生律 vs 十二平均律</title>
+    <style>
+        :root {
+            --bg-color: #1e1e24;
+            --text-color: #f0f0f0;
+            --axis-color: #555;
+            --pyth-color: #ff6b6b;
+            --et-color: #4ecdc4;
+            --highlight: #ffe66d;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2rem 2rem 4rem 2rem;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+        .header { margin-bottom: 1rem; }
+        h1 { font-size: 1.5rem; margin: 0 0 0.5rem 0; font-weight: 500; }
+        
+        .math-box {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid var(--highlight);
+            padding: 1rem 1.5rem;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 1.5rem;
+            font-family: monospace;
+            font-size: 1rem;
+            line-height: 1.6;
+            color: #ddd;
+        }
+        .math-box code {
+            background: rgba(0,0,0,0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--highlight);
+            font-weight: bold;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            background: #2b2b36;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        
+        /* 离散点滑块样式 */
+        .slider-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        input[type=range] {
+            width: 100%;
+            cursor: pointer;
+            margin-bottom: 5px;
+        }
+        .datalist-ticks {
+            display: flex;
+            justify-content: space-between;
+            padding: 0 5px;
+            color: #888;
+            font-size: 0.8rem;
+            user-select: none;
+        }
+
+        .step-display {
+            font-size: 1.2rem;
+            font-weight: bold;
+            min-width: 120px;
+            text-align: right;
+        }
+        
+        .canvas-container {
+            position: relative;
+            height: 350px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            padding-right: 5%;
+            margin-bottom: 1rem;
+        }
+        .axis-wrapper { position: relative; height: 120px; width: 100%; }
+        .axis-title { position: absolute; top: -10px; left: 0; font-size: 1.1rem; color: #888; }
+        .axis-line { position: absolute; bottom: 30px; left: 0; width: 100%; height: 2px; background-color: var(--axis-color); }
+        .marker {
+            position: absolute;
+            bottom: 30px;
+            width: 2px;
+            height: 30px;
+            transform: translateX(-50%);
+            transition: left 0.3s ease-out;
+            z-index: 5;
+        }
+        .marker.pyth { background-color: var(--pyth-color); }
+        .marker.et { background-color: var(--et-color); }
+        .marker-label {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.85rem;
+            white-space: nowrap;
+            background: var(--bg-color);
+            padding: 0 4px;
+        }
+        .marker-cents {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75rem;
+            color: #888;
+            white-space: nowrap;
+        }
+        .marker.new { z-index: 15; }
+        .marker.new .marker-label { color: var(--highlight); font-weight: bold; font-size: 1rem; z-index: 15; }
+        
+        .info-panel {
+            background: #2b2b36;
+            padding: 1.5rem;
+            border-radius: 8px;
+            min-height: 140px;
+            font-family: monospace;
+            font-size: 1.1rem;
+            line-height: 1.8;
+            margin-bottom: 2rem;
+        }
+        
+        .play-inline-btn {
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #666;
+            padding: 0.2rem 0.6rem;
+            font-size: 0.9rem;
+            border-radius: 4px;
+            margin-left: 10px;
+            cursor: pointer;
+            vertical-align: middle;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            transition: all 0.2s;
+        }
+        .play-inline-btn.pyth-btn:hover { background-color: var(--pyth-color); color: #000; border-color: var(--pyth-color); }
+        .play-inline-btn.et-btn:hover { background-color: var(--et-color); color: #000; border-color: var(--et-color); }
+        .play-inline-btn.mix-btn { background-color: #555; font-weight: bold; }
+        .play-inline-btn.mix-btn:hover { background-color: var(--highlight); color: #000; border-color: var(--highlight); }
+
+        .octave-line { position: absolute; top: 0; bottom: 0; width: 1px; border-left: 1px dashed rgba(255,255,255,0.3); z-index: 0; }
+        .octave-label { position: absolute; bottom: -20px; transform: translateX(-50%); color: rgba(255,255,255,0.5); font-size: 0.85rem; white-space: nowrap; }
+        .error-bracket { position: absolute; bottom: 70px; height: 15px; border-left: 1px solid var(--highlight); border-right: 1px solid var(--highlight); border-top: 1px solid var(--highlight); display: none; z-index: 20; }
+        .error-text { position: absolute; top: -40px; width: auto; white-space: nowrap; text-align: center; left: 50%; transform: translateX(-50%); color: var(--bg-color); background-color: var(--highlight); padding: 2px 8px; border-radius: 4px; font-size: 0.9rem; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>数学与音乐：乐律闭环悖论的几何证明</h1>
+    </div>
+
+    <div class="math-box">
+        <strong>音分 (Cents) 的物理意义：</strong>人耳对声音频率的感知是对数关系。系统定义绝对八度 (2:1) = 1200 音分。<br>
+        <strong>换算代数式：</strong> <code>n = 1200 × log₂(f₂ / f₁)</code><br>
+        ▸ 纯正五度 (3:2) = <code>1200 × log₂(1.5) ≈ 701.955 音分</code><br>
+        ▸ 平均律五度 (2^(7/12)) = <code>1200 × (7/12) = 700.000 音分</code>
+    </div>
+
+    <div class="controls">
+        <div class="slider-container">
+            <input type="range" id="stepSlider" min="0" max="12" step="1" value="0" list="tickmarks" oninput="handleSliderChange()">
+            <datalist id="tickmarks">
+                <option value="0"></option><option value="1"></option><option value="2"></option>
+                <option value="3"></option><option value="4"></option><option value="5"></option>
+                <option value="6"></option><option value="7"></option><option value="8"></option>
+                <option value="9"></option><option value="10"></option><option value="11"></option>
+                <option value="12"></option>
+            </datalist>
+            <div class="datalist-ticks">
+                <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+                <span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span>
+            </div>
+        </div>
+        <div class="step-display" id="stepDisplay">步数：0 / 12</div>
+    </div>
+
+    <div class="canvas-container" id="canvas">
+        <div class="octave-line" id="octaveLine"><div class="octave-label">1200音分 (绝对八度边界)</div></div>
+        <div class="axis-wrapper" id="axisPyth">
+            <div class="axis-title" style="color: var(--pyth-color);">五度相生律 (严格累加 log₂(1.5) ≈ 701.955 音分)</div>
+            <div class="axis-line"></div>
+            <div class="error-bracket" id="errorBracket"><div class="error-text">误差: 约 23.46 音分</div></div>
+        </div>
+        <div class="axis-wrapper" id="axisEt">
+            <div class="axis-title" style="color: var(--et-color);">十二平均律 (严格累加 700.000 音分)</div>
+            <div class="axis-line"></div>
+        </div>
+    </div>
+
+    <div class="info-panel" id="infoPanel">
+        请拖动滑块开始运算。
+    </div>
+
+    <script>
+        const MAX_CENTS_DISPLAY = 1280; 
+        const PURE_FIFTH = 1200 * Math.log2(1.5); 
+        const ET_FIFTH = 700.0;
+        const NOTES = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#', 'F', "C' (高八度)"];
+        
+        let audioCtx = null;
+        let activeOscillators = [];
+
+        function stopAudio() {
+            activeOscillators.forEach(osc => {
+                try { osc.stop(); } catch(e) {}
+            });
+            activeOscillators = [];
+        }
+
+        // 单音播放引擎
+        function playTone(cents) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            stopAudio();
+
+            const baseFreq = 261.626; // C4
+            const freq = baseFreq * Math.pow(2, cents / 1200);
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+
+            const now = audioCtx.currentTime;
+            gainNode.gain.setValueAtTime(0, now);
+            gainNode.gain.linearRampToValueAtTime(0.2, now + 0.02); 
+            gainNode.gain.exponentialRampToValueAtTime(0.001, now + 1.5); 
+
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 1.8);
+            
+            activeOscillators.push(osc);
+        }
+
+        // 拍频干涉测试引擎（双振荡器同时发生）
+        function playInterference(cents1, cents2) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            stopAudio();
+
+            const baseFreq = 261.626; // C4
+            const freq1 = baseFreq * Math.pow(2, cents1 / 1200);
+            const freq2 = baseFreq * Math.pow(2, cents2 / 1200);
+
+            const now = audioCtx.currentTime;
+
+            // 振荡器1
+            const osc1 = audioCtx.createOscillator();
+            const gainNode1 = audioCtx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.value = freq1;
+            gainNode1.gain.setValueAtTime(0, now);
+            gainNode1.gain.linearRampToValueAtTime(0.15, now + 0.05); // 音量减半防止削波
+            gainNode1.gain.exponentialRampToValueAtTime(0.001, now + 2.5); 
+            osc1.connect(gainNode1);
+            gainNode1.connect(audioCtx.destination);
+            osc1.start(now);
+            osc1.stop(now + 2.8);
+
+            // 振荡器2
+            const osc2 = audioCtx.createOscillator();
+            const gainNode2 = audioCtx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.value = freq2;
+            gainNode2.gain.setValueAtTime(0, now);
+            gainNode2.gain.linearRampToValueAtTime(0.15, now + 0.05); 
+            gainNode2.gain.exponentialRampToValueAtTime(0.001, now + 2.5); 
+            osc2.connect(gainNode2);
+            gainNode2.connect(audioCtx.destination);
+            osc2.start(now);
+            osc2.stop(now + 2.8);
+
+            activeOscillators.push(osc1, osc2);
+        }
+
+        function handleSliderChange() {
+            const step = parseInt(document.getElementById('stepSlider').value);
+            updateVisuals(step);
+            
+            // 自动触发最新五度相生律音的播放以提供反馈
+            if (step > 0) {
+                let rawPyth = step * PURE_FIFTH;
+                let displayPyth = (step === 12) ? (rawPyth - 7 * 1200 + 1200) : (rawPyth % 1200);
+                playTone(displayPyth);
+            }
+        }
+
+        function updateVisuals(step) {
+            document.getElementById('stepDisplay').innerText = `步数：${step} / 12`;
+            
+            const axisPyth = document.getElementById('axisPyth');
+            const axisEt = document.getElementById('axisEt');
+            const infoPanel = document.getElementById('infoPanel');
+            const errorBracket = document.getElementById('errorBracket');
+
+            document.querySelectorAll('.data-marker').forEach(e => e.remove());
+
+            let currentPythCents = 0;
+            let currentEtCents = 0;
+
+            for (let i = 0; i <= step; i++) {
+                let rawPyth = i * PURE_FIFTH;
+                let displayPyth = (i === 12) ? (rawPyth - 7 * 1200 + 1200) : (rawPyth % 1200);
+
+                let rawEt = i * ET_FIFTH;
+                let displayEt = (i === 12) ? 1200 : (rawEt % 1200);
+
+                const isNew = (i === step);
+
+                createMarker(axisPyth, displayPyth, NOTES[i], 'pyth', isNew);
+                createMarker(axisEt, displayEt, NOTES[i], 'et', isNew);
+
+                if (isNew) {
+                    currentPythCents = displayPyth;
+                    currentEtCents = displayEt;
+                }
+            }
+
+            const octavePos = (1200 / MAX_CENTS_DISPLAY) * 100;
+            document.getElementById('octaveLine').style.left = `${octavePos}%`;
+
+            if (step === 12) {
+                const pythFinal = (12 * PURE_FIFTH) - 7 * 1200 + 1200;
+                const startPct = (1200 / MAX_CENTS_DISPLAY) * 100;
+                const endPct = (pythFinal / MAX_CENTS_DISPLAY) * 100;
+                
+                errorBracket.style.display = 'block';
+                errorBracket.style.left = `${startPct}%`;
+                errorBracket.style.width = Math.max((endPct - startPct), 1.5) + `%`;
+
+                infoPanel.innerHTML = `
+                    <span style="color:var(--highlight)">[推演边界：系统代数不自洽]</span><br>
+                    误差：<code>23.46 音分</code>。在有理数约束下，推演结果无法回到基准频的整数倍。
+                    <button class="play-inline-btn pyth-btn" onclick="playTone(${currentPythCents})">▶ 独立验证：未闭合的 C' 音</button><br>
+                    引入无理数均摊误差，强制实现边界对齐 (1200 音分)。
+                    <button class="play-inline-btn et-btn" onclick="playTone(${currentEtCents})">▶ 独立验证：绝对闭合的 C' 音</button><br>
+                    声学干涉验证：同时播放产生明显的振幅调制现象（约 7Hz 拍频抖动）。
+                    <button class="play-inline-btn mix-btn" onclick="playInterference(${currentPythCents}, ${currentEtCents})">▶ 干涉物理测试 (同时播放)</button>
+                `;
+            } else if (step > 0) {
+                errorBracket.style.display = 'none';
+                
+                // 计算当前频率差异引起的拍频预估（基频假设 261.6Hz）
+                const f1 = 261.626 * Math.pow(2, currentPythCents / 1200);
+                const f2 = 261.626 * Math.pow(2, currentEtCents / 1200);
+                const beatFreq = Math.abs(f1 - f2).toFixed(1);
+
+                infoPanel.innerHTML = `
+                    当前运算节点: <span style="color:var(--highlight); font-weight:bold;">${NOTES[step]}</span> (系统代数偏差: ${(currentPythCents - currentEtCents).toFixed(2)} 音分)<br>
+                    五度相生律映射值: ${currentPythCents.toFixed(2)} 音分 
+                    <button class="play-inline-btn pyth-btn" onclick="playTone(${currentPythCents})">▶ 验证</button><br>
+                    十二平均律映射值: ${currentEtCents.toFixed(2)} 音分
+                    <button class="play-inline-btn et-btn" onclick="playTone(${currentEtCents})">▶ 验证</button><br>
+                    声学干涉验证：此步骤的拍频差约为 <code>${beatFreq} Hz</code>。
+                    <button class="play-inline-btn mix-btn" onclick="playInterference(${currentPythCents}, ${currentEtCents})">▶ 干涉物理测试 (同时播放)</button>
+                `;
+            } else {
+                errorBracket.style.display = 'none';
+                infoPanel.innerHTML = `运算处于初始状态 (0 音分基准)。请拖动滑块开始运算。`;
+            }
+        }
+
+        function createMarker(parent, cents, label, type, isNew) {
+            const pct = (cents / MAX_CENTS_DISPLAY) * 100;
+            const marker = document.createElement('div');
+            marker.className = `marker data-marker ${type} ${isNew ? 'new' : ''}`;
+            marker.style.left = `${pct}%`;
+
+            const labelEl = document.createElement('div');
+            labelEl.className = 'marker-label';
+            labelEl.innerText = label;
+
+            const centsEl = document.createElement('div');
+            centsEl.className = 'marker-cents';
+            centsEl.innerText = Math.round(cents);
+
+            marker.appendChild(labelEl);
+            marker.appendChild(centsEl);
+            parent.appendChild(marker);
+        }
+        
+        // 确保页面加载时初始化零状态
+        window.onload = () => updateVisuals(0);
+    </script>
+</body>
+</html>
